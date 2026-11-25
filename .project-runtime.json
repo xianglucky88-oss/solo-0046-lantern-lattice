@@ -1,0 +1,23 @@
+{
+  "project_shape": "backend",
+  "language": "Go",
+  "testing": "deferred",
+  "source_extensions": [
+    ".go"
+  ],
+  "build_command": "go build ./...",
+  "workflow_checks": [
+    {
+      "workflow_id": "product",
+      "command": "python3 -B tools/verify.py product"
+    },
+    {
+      "workflow_id": "persistence",
+      "command": "python3 -B tools/verify.py persistence"
+    },
+    {
+      "workflow_id": "contract",
+      "command": "python3 -B tools/verify.py contract"
+    }
+  ]
+}

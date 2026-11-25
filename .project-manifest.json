@@ -1,0 +1,256 @@
+{
+  "project_shape": "backend",
+  "modules": [
+    {
+      "id": "cmd-server-config",
+      "path": "cmd/server/config.go",
+      "role": "config"
+    },
+    {
+      "id": "cmd-server-main",
+      "path": "cmd/server/main.go",
+      "role": "main"
+    },
+    {
+      "id": "internal-domain-accumulate",
+      "path": "internal/domain/accumulate.go",
+      "role": "accumulate"
+    },
+    {
+      "id": "internal-domain-archive",
+      "path": "internal/domain/archive.go",
+      "role": "archive"
+    },
+    {
+      "id": "internal-domain-attenuation",
+      "path": "internal/domain/attenuation.go",
+      "role": "attenuation"
+    },
+    {
+      "id": "internal-domain-basis",
+      "path": "internal/domain/basis.go",
+      "role": "basis"
+    },
+    {
+      "id": "internal-domain-export",
+      "path": "internal/domain/export.go",
+      "role": "export"
+    },
+    {
+      "id": "internal-domain-grid",
+      "path": "internal/domain/grid.go",
+      "role": "grid"
+    },
+    {
+      "id": "internal-domain-input",
+      "path": "internal/domain/input.go",
+      "role": "input"
+    },
+    {
+      "id": "internal-domain-interpolation",
+      "path": "internal/domain/interpolation.go",
+      "role": "interpolation"
+    },
+    {
+      "id": "internal-domain-lattice",
+      "path": "internal/domain/lattice.go",
+      "role": "lattice"
+    },
+    {
+      "id": "internal-domain-metadata",
+      "path": "internal/domain/metadata.go",
+      "role": "metadata"
+    },
+    {
+      "id": "internal-domain-meters",
+      "path": "internal/domain/meters.go",
+      "role": "meters"
+    },
+    {
+      "id": "internal-domain-occupancy",
+      "path": "internal/domain/occupancy.go",
+      "role": "occupancy"
+    },
+    {
+      "id": "internal-domain-packing",
+      "path": "internal/domain/packing.go",
+      "role": "packing"
+    },
+    {
+      "id": "internal-domain-png",
+      "path": "internal/domain/png.go",
+      "role": "png"
+    },
+    {
+      "id": "internal-domain-probes",
+      "path": "internal/domain/probes.go",
+      "role": "probes"
+    },
+    {
+      "id": "internal-domain-project",
+      "path": "internal/domain/project.go",
+      "role": "project"
+    },
+    {
+      "id": "internal-domain-quantize",
+      "path": "internal/domain/quantize.go",
+      "role": "quantize"
+    },
+    {
+      "id": "internal-domain-ray",
+      "path": "internal/domain/ray.go",
+      "role": "ray"
+    },
+    {
+      "id": "internal-domain-validate",
+      "path": "internal/domain/validate.go",
+      "role": "validate"
+    },
+    {
+      "id": "internal-domain-vector",
+      "path": "internal/domain/vector.go",
+      "role": "vector"
+    },
+    {
+      "id": "internal-domain-visibility",
+      "path": "internal/domain/visibility.go",
+      "role": "visibility"
+    },
+    {
+      "id": "internal-domain-weights",
+      "path": "internal/domain/weights.go",
+      "role": "weights"
+    },
+    {
+      "id": "internal-service-build",
+      "path": "internal/service/build.go",
+      "role": "build"
+    },
+    {
+      "id": "internal-service-decode",
+      "path": "internal/service/decode.go",
+      "role": "decode"
+    },
+    {
+      "id": "internal-service-download",
+      "path": "internal/service/download.go",
+      "role": "download"
+    },
+    {
+      "id": "internal-service-example",
+      "path": "internal/service/example.go",
+      "role": "example"
+    },
+    {
+      "id": "internal-service-health",
+      "path": "internal/service/health.go",
+      "role": "health"
+    },
+    {
+      "id": "internal-service-output",
+      "path": "internal/service/output.go",
+      "role": "output"
+    },
+    {
+      "id": "internal-service-router",
+      "path": "internal/service/router.go",
+      "role": "router"
+    },
+    {
+      "id": "internal-service-service",
+      "path": "internal/service/service.go",
+      "role": "service"
+    },
+    {
+      "id": "internal-vault-digest",
+      "path": "internal/vault/digest.go",
+      "role": "digest"
+    },
+    {
+      "id": "internal-vault-read",
+      "path": "internal/vault/read.go",
+      "role": "read"
+    },
+    {
+      "id": "internal-vault-stage",
+      "path": "internal/vault/stage.go",
+      "role": "stage"
+    },
+    {
+      "id": "internal-vault-write",
+      "path": "internal/vault/write.go",
+      "role": "write"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "product",
+      "name": "遮挡探针烘焙",
+      "entry": "POST /v1/build",
+      "success": "点光源累积到六方向，插值剔除不可见邻点，输出可解码 PNG 与空间布局。",
+      "failure": "非法网格、光源或无体积遮挡盒返回 422。",
+      "verification": "python3 -B tools/verify.py product",
+      "steps": [
+        "POST /v1/build",
+        "点光源累积到六方向，插值剔除不可见邻点，输出可解码 PNG 与空间布局。"
+      ],
+      "module_ids": [
+        "internal-domain-validate",
+        "internal-domain-probes",
+        "internal-domain-ray",
+        "internal-domain-interpolation",
+        "internal-domain-png",
+        "internal-domain-metadata"
+      ]
+    },
+    {
+      "id": "persistence",
+      "name": "成品归档与复取",
+      "entry": "POST /v1/build、GET /v1/artifacts/{digest}",
+      "success": "重复提交同一成品只归档一次；重启后复取字节相同。",
+      "failure": "内容被改动或格式不符时不会把错误数据当成指定制品返回。",
+      "verification": "python3 -B tools/verify.py persistence",
+      "steps": [
+        "POST /v1/build、GET /v1/artifacts/{digest}",
+        "重复提交同一成品只归档一次；重启后复取字节相同。"
+      ],
+      "module_ids": [
+        "internal-service-build",
+        "internal-vault-write",
+        "internal-vault-stage",
+        "internal-vault-read",
+        "internal-service-download"
+      ]
+    },
+    {
+      "id": "contract",
+      "name": "输入与 HTTP 合同",
+      "entry": "GET /v1/example、POST /v1/build",
+      "success": "内置合成请求以 JSON 提供，按入口契约接收。",
+      "failure": "错误媒体类型、未知字段、多余内容与超长输入分级拒绝。",
+      "verification": "python3 -B tools/verify.py contract",
+      "steps": [
+        "GET /v1/example、POST /v1/build",
+        "内置合成请求以 JSON 提供，按入口契约接收。"
+      ],
+      "module_ids": [
+        "internal-service-example",
+        "internal-service-router",
+        "internal-service-decode",
+        "internal-service-output"
+      ]
+    }
+  ],
+  "complexity": {
+    "mechanisms": [
+      "policy_rules",
+      "capacity",
+      "error_propagation",
+      "export_freeze",
+      "idempotency",
+      "concurrency",
+      "snapshot_consistency",
+      "versioning_audit"
+    ]
+  }
+}
