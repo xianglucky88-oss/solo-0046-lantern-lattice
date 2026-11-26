@@ -16,6 +16,10 @@
       "command": "python3 -B tools/verify.py persistence"
     },
     {
+      "workflow_id": "resume",
+      "command": "python3 -B tools/verify.py resume"
+    },
+    {
       "workflow_id": "contract",
       "command": "python3 -B tools/verify.py contract"
     }

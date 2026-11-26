@@ -2,6 +2,11 @@
   "project_shape": "backend",
   "modules": [
     {
+      "id": "cmd-offline-main",
+      "path": "cmd/offline/main.go",
+      "role": "offline"
+    },
+    {
       "id": "cmd-server-config",
       "path": "cmd/server/config.go",
       "role": "config"
@@ -122,9 +127,39 @@
       "role": "weights"
     },
     {
+      "id": "internal-domain-identity",
+      "path": "internal/domain/identity.go",
+      "role": "identity"
+    },
+    {
+      "id": "internal-domain-patch",
+      "path": "internal/domain/patch.go",
+      "role": "patch"
+    },
+    {
+      "id": "internal-domain-revision",
+      "path": "internal/domain/revision.go",
+      "role": "revision"
+    },
+    {
       "id": "internal-service-build",
       "path": "internal/service/build.go",
       "role": "build"
+    },
+    {
+      "id": "internal-service-patch-download",
+      "path": "internal/service/patch_download.go",
+      "role": "patch-download"
+    },
+    {
+      "id": "internal-service-revisions",
+      "path": "internal/service/revisions.go",
+      "role": "revisions"
+    },
+    {
+      "id": "internal-service-version",
+      "path": "internal/service/version.go",
+      "role": "version"
     },
     {
       "id": "internal-service-decode",
@@ -160,6 +195,11 @@
       "id": "internal-service-service",
       "path": "internal/service/service.go",
       "role": "service"
+    },
+    {
+      "id": "internal-vault-named",
+      "path": "internal/vault/named.go",
+      "role": "named"
     },
     {
       "id": "internal-vault-digest",
@@ -220,6 +260,29 @@
         "internal-vault-stage",
         "internal-vault-read",
         "internal-service-download"
+      ]
+    },
+    {
+      "id": "resume",
+      "name": "灯具版本续烘与离线补件",
+      "entry": "POST /v1/revisions、GET /v1/patches/{id}、cmd/offline",
+      "success": "按稳定标识增删改点光源，重求集受额度约束，仅遮挡点不占额度；新包与全量烘焙字节一致，可凭补件、旧回执和旧包离线重建。",
+      "failure": "超额、基版缺失或损坏、身份或摘要不符时拒绝，且不产生可下载或可续烘的新版本，已有版本仍可复取。",
+      "verification": "python3 -B tools/verify.py resume",
+      "steps": [
+        "POST /v1/build（Resumable）取得灯具版本身份",
+        "POST /v1/revisions 按稳定标识续烘并取得补件入口",
+        "cmd/offline 用补件、旧回执和旧包离线重建字节相同的新包"
+      ],
+      "module_ids": [
+        "internal-domain-revision",
+        "internal-domain-identity",
+        "internal-domain-patch",
+        "internal-service-revisions",
+        "internal-service-version",
+        "internal-service-patch-download",
+        "internal-vault-named",
+        "cmd-offline-main"
       ]
     },
     {
