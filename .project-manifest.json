@@ -22,6 +22,31 @@
       "role": "archive"
     },
     {
+      "id": "internal-domain-atlas",
+      "path": "internal/domain/atlas.go",
+      "role": "atlas"
+    },
+    {
+      "id": "internal-domain-import",
+      "path": "internal/domain/import.go",
+      "role": "import"
+    },
+    {
+      "id": "internal-domain-report",
+      "path": "internal/domain/report.go",
+      "role": "report"
+    },
+    {
+      "id": "internal-domain-sample",
+      "path": "internal/domain/sample.go",
+      "role": "sample"
+    },
+    {
+      "id": "internal-domain-tile",
+      "path": "internal/domain/tile.go",
+      "role": "tile"
+    },
+    {
       "id": "internal-domain-attenuation",
       "path": "internal/domain/attenuation.go",
       "role": "attenuation"
@@ -147,6 +172,11 @@
       "role": "health"
     },
     {
+      "id": "internal-service-import",
+      "path": "internal/service/import.go",
+      "role": "import"
+    },
+    {
       "id": "internal-service-output",
       "path": "internal/service/output.go",
       "role": "output"
@@ -155,6 +185,11 @@
       "id": "internal-service-router",
       "path": "internal/service/router.go",
       "role": "router"
+    },
+    {
+      "id": "internal-service-sample",
+      "path": "internal/service/sample.go",
+      "role": "sample"
     },
     {
       "id": "internal-service-service",
@@ -183,6 +218,29 @@
     }
   ],
   "workflows": [
+    {
+      "id": "tiled",
+      "name": "分页烘焙与离线导入取样",
+      "entry": "POST /v1/build（带 MaxTextureWidth/Height）、POST /v1/import、GET /v1/artifacts/{digest}/sample",
+      "success": "每页不超过设备纹理上限且可单独上传；导入核对尺寸、边界、完整覆盖与重复像素一致性，逻辑双线性取样与原条带一致。",
+      "failure": "上限小于 2、缺少声明页、片段越界、覆盖空洞或重复像素冲突均在导入阶段拒绝。",
+      "verification": "python3 -B tools/verify.py tiled",
+      "steps": [
+        "POST /v1/build（带 MaxTextureWidth/Height）",
+        "POST /v1/import",
+        "GET /v1/artifacts/{digest}/sample"
+      ],
+      "module_ids": [
+        "internal-domain-tile",
+        "internal-domain-atlas",
+        "internal-domain-archive",
+        "internal-domain-import",
+        "internal-domain-sample",
+        "internal-domain-report",
+        "internal-service-import",
+        "internal-service-sample"
+      ]
+    },
     {
       "id": "product",
       "name": "遮挡探针烘焙",

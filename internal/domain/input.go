@@ -1,11 +1,13 @@
 package domain
 
 type Request struct {
-	Grid     Grid
-	Lights   []Light
-	Blocks   []Box
-	Samples  []Vec
-	Exposure float64
+	Grid            Grid
+	Lights          []Light
+	Blocks          []Box
+	Samples         []Vec
+	Exposure        float64
+	MaxTextureWidth  *int
+	MaxTextureHeight *int
 }
 type Grid struct {
 	Origin Vec

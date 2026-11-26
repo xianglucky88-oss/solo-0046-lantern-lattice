@@ -23,6 +23,17 @@ func validate(r Request) error {
 			return fmt.Errorf("grid axes must have 2–16 probes")
 		}
 	}
+	if r.MaxTextureWidth != nil && *r.MaxTextureWidth < 2 {
+		return fmt.Errorf("texture width limit must be at least 2 pixels")
+	}
+	if r.MaxTextureHeight != nil && *r.MaxTextureHeight < 2 {
+		return fmt.Errorf("texture height limit must be at least 2 pixels")
+	}
+	for _, limit := range []*int{r.MaxTextureWidth, r.MaxTextureHeight} {
+		if limit != nil && *limit > maxTextureLimit {
+			return fmt.Errorf("texture size limit above %d pixels", maxTextureLimit)
+		}
+	}
 	if !spatial(r.Grid.position(r.Grid.Size[0]-1, r.Grid.Size[1]-1, r.Grid.Size[2]-1)) {
 		return fmt.Errorf("grid spans beyond scene bounds")
 	}

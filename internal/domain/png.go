@@ -1,29 +1,12 @@
 package domain
 
-import (
-	"bytes"
-	"image"
-	"image/color"
-	"image/png"
-)
+import "image"
 
 func texture(g Grid, probes []Probe, exposure float64) ([]byte, error) {
-	im := image.NewNRGBA(image.Rect(0, 0, g.Size[0]*6, g.Size[1]*g.Size[2]))
-	for z := range g.Size[2] {
-		for y := range g.Size[1] {
-			for x := range g.Size[0] {
-				p := probes[g.index(x, y, z)]
-				if !p.Valid {
-					continue
-				}
-				for i, e := range p.Irradiance {
-					px, py := pixel(g, x, y, z, i)
-					im.SetNRGBA(px, py, color.NRGBA{R: quantize(e[0], exposure), G: quantize(e[1], exposure), B: quantize(e[2], exposure), A: 255})
-				}
-			}
-		}
-	}
-	var out bytes.Buffer
-	err := png.Encode(&out, im)
-	return out.Bytes(), err
+	return encodePNG(logicalAtlas(g, probes, exposure))
+}
+
+// faceLayerRect is the region of one (face, depth layer z) inside the logical atlas.
+func faceLayerRect(g Grid, face, z int) image.Rectangle {
+	return image.Rect(face*g.Size[0], z*g.Size[1], (face+1)*g.Size[0], (z+1)*g.Size[1])
 }
