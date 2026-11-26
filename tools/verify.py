@@ -2,6 +2,7 @@ import concurrent.futures
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -78,7 +79,23 @@ def contract(s):
     assert s.call('/v1/artifacts/absent')[0] == 404
 
 
+def ensure_go_on_path():
+    if shutil.which('go'):
+        return
+    candidates = (
+        '/usr/local/go/bin',
+        '/opt/go/bin',
+        '/tmp/go-toolchain/go/bin',
+        str(Path.home() / '.local' / 'go' / 'bin'),
+    )
+    for directory in candidates:
+        if (Path(directory) / 'go').exists():
+            os.environ['PATH'] = directory + os.pathsep + os.environ.get('PATH', '')
+            return
+
+
 def main():
+    ensure_go_on_path()
     mode = sys.argv[1] if len(sys.argv) > 1 else 'all'
     if mode not in ('product', 'persistence', 'contract', 'all'):
         raise SystemExit('mode: product | persistence | contract | all')

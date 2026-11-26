@@ -6,6 +6,8 @@
 
 `Samples` 的查询结果包含 `sampled`、`outside`、`solid` 或 `unsupported`。三线性权重只从有效且视线畅通的邻点归一化；`Weight` 是归一化前的支持率。JSON 中是线性域参考值；不包含间接反弹或材质模拟。
 
+除原尺寸校样外，`layout.json` 的 `Resource`/`lantern-probe-resource/v1` 保存可实例化资源：局部 `Grid`、`Lights`、`Blocks`、探针有效位以及为每个“灯 × 探针”烘焙的视线矩阵。实例参数为平移、0.25–4 的等比缩放、轴置换和逐轴正向翻转；世界坐标按 `W[a]=Translation[a]+Scale*Sign[a]*Local[Axis[a]]` 映射。世界取样点先逆变换为实际传入坐标对应的局部点，再使用原网格容差和邻点权重。灯到探针遮挡只读烘焙矩阵；衰减使用摆放后的世界距离，`Radius`、`Power`、线性 RGB 不随缩放改变，六向结果按世界轴投影。所有实心、相切、共点和间隙判断均在局部几何完成。摆放后网格角点仍限 ±1e5，世界步长限 0.01–2048。同一资源可同时服务多个不同朝向和尺寸的实例。
+
 ZIP 包含 `layout.json` 和 `probes.png`。栅格坐标 `(x,y,z)` 与方向 `face` 的像素为 `(x+face*X,y+z*Y)`。有效像素 Alpha 为 255，即使其 RGB 全零；无效像素透明。RGB 使用 `round(255*(1-exp(-energy*Exposure)))` 映射，不是 sRGB 纹理。消费方应使用线性纹理采样并按 Alpha 判断有效性。
 
 ## HTTP 接口
@@ -15,6 +17,8 @@ ZIP 包含 `layout.json` 和 `probes.png`。栅格坐标 `(x,y,z)` 与方向 `fa
 | `GET /healthz` | 进程就绪 |
 | `GET /v1/example` | 无外部依赖的合成请求 |
 | `POST /v1/build` | 新成品返回 201；已存在的相同制品返回 200；均带 `digest`、`bytes`、`artifact` 与 `Location` |
+| `POST /v1/resources` | 可选工具入口：直接返回精确实例探针资源 JSON，校验规则同 `/v1/build` |
+| `POST /v1/instances/sample` | 可选引擎/工具入口：提交下载到的资源或其摘要、摆放参数与世界点，返回线性 `Sample` |
 | `GET /v1/artifacts/{digest}` | 原始成品下载；支持 ETag 与字节范围；未知摘要 404，摘要不符 409 |
 
 提交仅接受 JSON，最多 3 MiB；未知字段、多余 JSON 值 400，类型错误 415，超体积 413，领域拒绝 422，同时处理中的构建最多 2 项，繁忙返回 503。不提供鉴权和多租户隔离，部署为本地工具服务，不应直接暴露到公网。应由使用者管理归档目录容量和保留期；服务不覆盖已有摘要。归档文件系统须支持硬链接。
