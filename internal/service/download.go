@@ -24,9 +24,10 @@ func (s *Service) download(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, "cannot read artifact")
 		return
 	}
-	w.Header().Set("Content-Disposition", `attachment; filename="`+domain.Filename+`"`)
+	name := domain.DownloadName(data)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
 	w.Header().Set("ETag", `"`+digest+`"`)
-	http.ServeContent(w, r, domain.Filename, time.Time{}, bytes.NewReader(data))
+	http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(data))
 }

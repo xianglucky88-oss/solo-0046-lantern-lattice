@@ -1,6 +1,11 @@
 package service
 
-import "net/http"
+import (
+	"errors"
+	"net/http"
+
+	"example.local/lantern-lattice/internal/domain"
+)
 
 type Receipt struct {
 	Digest   string `json:"digest"`
@@ -17,29 +22,56 @@ func (s *Service) build(w http.ResponseWriter, r *http.Request) {
 		problem(w, 503, "compiler busy")
 		return
 	}
-	input, status, err := decode(w, r)
+
+	input, status, err := decodeBuild(w, r)
 	if err != nil {
 		problem(w, status, err.Error())
 		return
 	}
-	bytes, err := compile(input)
-	if err != nil {
-		problem(w, 422, err.Error())
+	tierOpts, tierRequested, partial := resolveTierOptions(withQueryAliases(input.raw, r))
+
+	bundle, buildErr := domain.BuildTiered(input.Request, tierOpts)
+	var budgetErr *domain.CoarseBudgetError
+	coarseFailed := buildErr != nil && errors.As(buildErr, &budgetErr)
+
+	if buildErr != nil && !(tierRequested && partial && coarseFailed && bundle != nil) {
+		if coarseFailed {
+			coarseProblem(w, budgetErr)
+			return
+		}
+		problem(w, http.StatusUnprocessableEntity, buildErr.Error())
 		return
 	}
 	if r.Context().Err() != nil {
 		return
 	}
-	digest, created, err := s.vault.Put(bytes)
+
+	digest, created, err := s.vault.Put(bundle.Original)
 	if err != nil {
 		problem(w, 500, "cannot save artifact")
 		return
 	}
 	location := "/v1/artifacts/" + digest
 	w.Header().Set("Location", location)
-	status = 200
+	statusCode := http.StatusOK
 	if created {
-		status = 201
+		statusCode = http.StatusCreated
 	}
-	writeJSON(w, status, Receipt{digest, len(bytes), location})
+
+	if !tierRequested {
+		writeJSON(w, statusCode, Receipt{digest, len(bundle.Original), location})
+		return
+	}
+
+	var body map[string]any
+	if coarseFailed {
+		body, err = s.partialReceipt(digest, bundle, budgetErr)
+	} else {
+		body, err = s.tieredReceipt(digest, bundle)
+	}
+	if err != nil {
+		problem(w, 500, "cannot save tier artifact")
+		return
+	}
+	writeJSON(w, statusCode, body)
 }
