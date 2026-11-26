@@ -9,7 +9,15 @@ func Build(r Request) ([]byte, error) {
 		return nil, err
 	}
 	probes := bake(r)
-	metadata, err := json.MarshalIndent(describe(r, probes), "", "  ")
+	var report *RescueReport
+	if r.Rescue != nil {
+		plan := planRescue(r, probes)
+		choice := plan.optimize()
+		plan.apply(r, probes, choice)
+		filled := buildRescueReport(r, probes, plan, choice)
+		report = &filled
+	}
+	metadata, err := json.MarshalIndent(describe(r, probes, report), "", "  ")
 	if err != nil {
 		return nil, err
 	}

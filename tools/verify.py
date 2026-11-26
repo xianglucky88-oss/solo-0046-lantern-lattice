@@ -90,6 +90,7 @@ def main():
                 contract(s)
             if mode in ('product', 'all'):
                 check_product(s)
+                check_rescue(s)
             if mode in ('persistence', 'all'):
                 example = s.demo()
                 with concurrent.futures.ThreadPoolExecutor(2) as pool:
@@ -167,6 +168,80 @@ def check_product(s):
     assert s.post(req)[0]==422
     req['Grid']['Size']=[3,2,2]; req['Blocks'][0]['Min']=req['Blocks'][0]['Max']
     assert s.post(req)[0]==422
+
+
+def check_rescue(s):
+    request = {
+        'Grid': {'Origin': [0, -0.5, 0], 'Step': 1, 'Size': [4, 2, 2]},
+        'Exposure': 3,
+        'Lights': [
+            {'Position': [1.5, 2, 0.5], 'RGB': [1, 0, 0], 'Radius': 8, 'Power': 4},
+            {'Position': [1.5, -2, 0.5], 'RGB': [0, 0, 1], 'Radius': 8, 'Power': 4},
+        ],
+        'Blocks': [
+            {'Min': [-0.5, 0.24, -0.5], 'Max': [3.5, 0.26, 1.5]},
+            {'Min': [1.95, 0.45, -0.05], 'Max': [2.05, 0.55, 0.05]},
+            {'Min': [2.95, 0.45, -0.05], 'Max': [3.05, 0.55, 0.05]},
+            # An unrescued blocked slot keeps one transparent pixel.
+            {'Min': [-0.05, 0.45, 0.95], 'Max': [0.05, 0.55, 1.05]},
+        ],
+        'Samples': [],
+        'Rescue': {
+            'MaxMove': 1,
+            'Slots': [
+                {'X': 2, 'Y': 1, 'Z': 0, 'Candidates': [[2.2, 0.5, 0]]},
+                {'X': 3, 'Y': 1, 'Z': 0, 'Candidates': [[2.8, 0.5, 0]]},
+            ],
+            'Checkpoints': [
+                {'Position': [2.4, 0.5, 0], 'MinSupport': 0.7},
+                {'Position': [2.6, 0.5, 0], 'MinSupport': 0.7},
+                {'Position': [0, 0.25, 0], 'MinSupport': 0.5},
+                {'Position': [9, 0, 0], 'MinSupport': 0.5},
+            ],
+        },
+    }
+    row = receipt(s.post(request))
+    with zipfile.ZipFile(io.BytesIO(fetch(s, row))) as z:
+        layout = json.loads(z.read('layout.json'))
+        w, h, rgba = pixels(z.read('probes.png'))
+    report = layout.get('Rescue')
+    assert report and len(report['Slots']) == 2
+    assert all(slot['Moved'] and 0 < slot['Factor'] < 1 and slot['Move'] <= 1
+               for slot in report['Slots'])
+    checks = report['Checkpoints']
+    assert [c['State'] for c in checks] == ['active', 'active', 'solid', 'outside']
+    active = checks[:2]
+    assert all(c['Pass'] and c['Support'] >= c['MinSupport'] for c in active)
+    assert all(all(lobe[2] == 0 for lobe in c['Linear']) for c in active)
+    assert checks[2]['Pass'] is False and checks[2]['Linear'] is None
+    assert checks[3]['Pass'] is False and checks[3]['Linear'] is None
+    # Texture still addresses the original slots; rescued pixels are opaque.
+    for slot in report['Slots']:
+        px = slot['X']
+        py = slot['Y'] + slot['Z'] * layout['Grid']['Size'][1]
+        assert rgba[py][px][3] == 255
+    # Identical input must produce the identical artifact.
+    assert receipt(s.post(request))['digest'] == row['digest']
+    # Requests without rescue keep the old layout shape.
+    plain = dict(request)
+    del plain['Rescue']
+    plain_row = receipt(s.post(plain))
+    with zipfile.ZipFile(io.BytesIO(fetch(s, plain_row))) as z:
+        plain_layout = json.loads(z.read('layout.json'))
+    assert 'Rescue' not in plain_layout
+    # Rejection boundaries.
+    bad = json.loads(json.dumps(request))
+    bad['Rescue']['Slots'][0]['Candidates'] = [[0.1, 0.5, 0]]
+    assert s.post(bad)[0] == 422
+    bad = json.loads(json.dumps(request))
+    bad['Rescue']['Slots'] = [
+        {'X': i % 4, 'Y': (i // 4) % 2, 'Z': i // 8, 'Candidates': [[2.1, 0.5, 0]]}
+        for i in range(9)
+    ]
+    assert s.post(bad)[0] == 422
+    bad = json.loads(json.dumps(request))
+    bad['Rescue']['Slots'][0]['Candidates'] = [[2.1, 0.5, 0]] * 5
+    assert s.post(bad)[0] == 422
 
 
 if __name__ == '__main__':
