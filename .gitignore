@@ -1,3 +1,12 @@
 /.local/
 /__pycache__/
+__pycache__/
+*.pyc
 .DS_Store
+/preview-out/
+/out/
+/preview.png
+/probes.png
+/probes-recolored.png
+/preview.json
+/samples.json

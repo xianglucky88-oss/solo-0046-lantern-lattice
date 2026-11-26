@@ -1,26 +1,21 @@
 package domain
 
-type Probe struct {
-	Position               Vec
-	Valid                  bool
-	Irradiance             Lobes
-	Contributing, Occluded int
-}
-
-func bake(r Request) []Probe {
-	g := r.Grid
-	out := make([]Probe, g.count())
-	for z := range g.Size[2] {
-		for y := range g.Size[1] {
-			for x := range g.Size[0] {
-				p := g.position(x, y, z)
-				s := Probe{Position: p, Valid: !occupied(p, r.Blocks)}
-				if s.Valid {
-					s.Irradiance, s.Contributing, s.Occluded = incoming(p, r.Lights, r.Blocks)
-				}
-				out[g.index(x, y, z)] = s
-			}
+func incoming(p Vec, lights []Light, blocks []Box) (Lobes, int, int) {
+	var result Lobes
+	var visibleCount, blockedCount int
+	for _, lamp := range lights {
+		dir := lamp.Position.sub(p)
+		d := dir.length()
+		w := attenuation(d, lamp.Radius, lamp.Power)
+		if w == 0 {
+			continue
 		}
+		if !visible(p, lamp.Position, blocks) {
+			blockedCount++
+			continue
+		}
+		visibleCount++
+		result.project(dir, d, lamp.RGB.scale(w))
 	}
-	return out
+	return result, visibleCount, blockedCount
 }

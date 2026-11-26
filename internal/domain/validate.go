@@ -54,5 +54,8 @@ func validate(r Request) error {
 			return fmt.Errorf("query %d invalid", i)
 		}
 	}
+	if err := resolveFaces(&r); err != nil {
+		return err
+	}
 	return nil
 }

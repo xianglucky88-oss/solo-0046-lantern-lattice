@@ -8,8 +8,8 @@ func Build(r Request) ([]byte, error) {
 	if err := validate(r); err != nil {
 		return nil, err
 	}
-	probes := bake(r)
-	metadata, err := json.MarshalIndent(describe(r, probes), "", "  ")
+	probes, basis := bakeFull(r)
+	metadata, err := json.MarshalIndent(describe(r, probes, basis), "", "  ")
 	if err != nil {
 		return nil, err
 	}
