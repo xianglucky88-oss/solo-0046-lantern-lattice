@@ -5,6 +5,11 @@ type Sample struct {
 	State      string
 	Weight     float64
 	Irradiance Lobes
+
+	// SupportDuration and SolidDuration are reported only by time-varying
+	// bakes; the static path leaves them zero and omits them via omitempty.
+	SupportDuration float64 `json:",omitempty"`
+	SolidDuration   float64 `json:",omitempty"`
 }
 
 func sample(g Grid, probes []Probe, p Vec, blocks []Box) Sample {
