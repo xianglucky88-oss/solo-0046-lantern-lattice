@@ -18,6 +18,13 @@ func validate(r Request) error {
 	if !spatial(r.Grid.Origin) || !bounded(r.Grid.Step, 0.01, 2048) || !bounded(r.Exposure, 0.01, 64) {
 		return fmt.Errorf("invalid origin, spacing or exposure")
 	}
+	for i, c := range r.EffectiveSky() {
+		for ch, v := range c {
+			if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 || v > 1e4 {
+				return fmt.Errorf("sky axis %d channel %d outside linear range", i, ch)
+			}
+		}
+	}
 	for _, n := range r.Grid.Size {
 		if n < 2 || n > 16 {
 			return fmt.Errorf("grid axes must have 2–16 probes")

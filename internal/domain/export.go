@@ -9,13 +9,23 @@ func Build(r Request) ([]byte, error) {
 		return nil, err
 	}
 	probes := bake(r)
-	metadata, err := json.MarshalIndent(describe(r, probes), "", "  ")
+	base := describe(r, probes)
+
+	var (
+		metadata []byte
+		err      error
+	)
+	if r.SkyEnabled() || r.EmbedLinear {
+		metadata, err = json.MarshalIndent(extendMetadata(r, base, probes), "", "  ")
+	} else {
+		metadata, err = json.MarshalIndent(base, "", "  ")
+	}
 	if err != nil {
 		return nil, err
 	}
-	bytes, err := texture(r.Grid, probes, r.Exposure)
+	atlas, err := texture(r.Grid, probes, r.Exposure)
 	if err != nil {
 		return nil, err
 	}
-	return pack(metadata, bytes)
+	return pack(metadata, atlas)
 }
