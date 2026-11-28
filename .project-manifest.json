@@ -77,6 +77,21 @@
       "role": "packing"
     },
     {
+      "id": "internal-domain-plan",
+      "path": "internal/domain/plan.go",
+      "role": "plan"
+    },
+    {
+      "id": "internal-domain-transition",
+      "path": "internal/domain/transition.go",
+      "role": "transition"
+    },
+    {
+      "id": "internal-domain-wall",
+      "path": "internal/domain/wall.go",
+      "role": "wall"
+    },
+    {
       "id": "internal-domain-png",
       "path": "internal/domain/png.go",
       "role": "png"
@@ -187,16 +202,20 @@
       "id": "product",
       "name": "遮挡探针烘焙",
       "entry": "POST /v1/build",
-      "success": "点光源累积到六方向，插值剔除不可见邻点，输出可解码 PNG 与空间布局。",
-      "failure": "非法网格、光源或无体积遮挡盒返回 422。",
+      "success": "两套异距网格各输出六方向贴图；门两侧用同一世界坐标跨门取光，过渡带内按有符号墙距移交权重。",
+      "failure": "非法网格、光源、薄墙开口或无体积遮挡盒返回 422。",
       "verification": "python3 -B tools/verify.py product",
       "steps": [
         "POST /v1/build",
-        "点光源累积到六方向，插值剔除不可见邻点，输出可解码 PNG 与空间布局。"
+        "点光源累积到六方向，插值剔除不可见邻点，输出可解码 PNG 与空间布局。",
+        "两套网格各自烘焙，薄墙与实心盒遮挡，过渡带内跨门混合。"
       ],
       "module_ids": [
         "internal-domain-validate",
         "internal-domain-probes",
+        "internal-domain-plan",
+        "internal-domain-wall",
+        "internal-domain-transition",
         "internal-domain-ray",
         "internal-domain-interpolation",
         "internal-domain-png",

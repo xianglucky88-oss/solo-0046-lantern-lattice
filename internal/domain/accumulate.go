@@ -1,6 +1,6 @@
 package domain
 
-func incoming(p Vec, lights []Light, blocks []Box) (Lobes, int, int) {
+func incoming(p Vec, lights []Light, blocks []Box, wall wallBasis) (Lobes, int, int) {
 	var result Lobes
 	var visibleCount, blockedCount int
 	for _, lamp := range lights {
@@ -10,7 +10,7 @@ func incoming(p Vec, lights []Light, blocks []Box) (Lobes, int, int) {
 		if w == 0 {
 			continue
 		}
-		if !visible(p, lamp.Position, blocks) {
+		if !visible(p, lamp.Position, blocks, wall) {
 			blockedCount++
 			continue
 		}

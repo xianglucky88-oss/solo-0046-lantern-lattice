@@ -2,18 +2,24 @@
 
 ## 领域流程
 
-`Grid.Size` 每轴 2–16，`Origin`、`Step` 定义均匀三维网格。`Lights` 为线性 RGB 点光源，按半径截断后以 `(1-d/r)^2/(1+d^2)` 衰减，再乘光源功率；能量以六轴的非负余弦投影，光源与探针重合时六个方向取相同的能量（每方向权重为 1）。`Blocks` 是轴对齐闭区间盒，探针在盒内或边界标为无效；射线与盒相切也阻挡。
+一次烘焙服务两套探针网格，它们分处一张无厚度薄墙的两侧、间距可以不同，共用同一组点光源和实心盒。`Grids` 恰有两个元素，`Side` 为 `-1` 或 `+1` 标明所属墙侧，两者必须相反；`Origin`、`Step`、`Size` 各自定义均匀三维网格（每轴 2–16）。旧式单网格请求（`Grid` 而无 `Wall`）仍被接受并保持原有行为。
 
-`Samples` 的查询结果包含 `sampled`、`outside`、`solid` 或 `unsupported`。三线性权重只从有效且视线畅通的邻点归一化；`Weight` 是归一化前的支持率。JSON 中是线性域参考值；不包含间接反弹或材质模拟。
+`Wall` 为无厚度矩形：`Center` 中心、`Normal` 法线、`Up` 决定平面内轴向、`Half` 两向半宽，`Opening` 是墙内 (Right, Up) 坐标的矩形开口。开口边缘属于墙。`layout.json` 回显规范化后的 `Normal`/`Up`/`Right` 正交基与有符号墙距口径。
 
-ZIP 包含 `layout.json` 和 `probes.png`。栅格坐标 `(x,y,z)` 与方向 `face` 的像素为 `(x+face*X,y+z*Y)`。有效像素 Alpha 为 255，即使其 RGB 全零；无效像素透明。RGB 使用 `round(255*(1-exp(-energy*Exposure)))` 映射，不是 sRGB 纹理。消费方应使用线性纹理采样并按 Alpha 判断有效性。
+`Lights` 为线性 RGB 点光源，按半径截断后以 `(1-d/r)^2/(1+d^2)` 衰减，再乘光源功率；能量以六轴的非负余弦投影，光源与探针重合时六方向取相同能量（每方向权重 1）。`Blocks` 是轴对齐闭区间盒，探针在盒内或边界标为无效；射线与盒相切也阻挡。
+
+灯到探针、探针到查询点的有限线段只要接触闭墙就被挡。线段一端落在开口严格内部时该端点可用；沿墙面的线段只有全段留在开口严格内部才可通行。贴图按两套网格的实际槽位烘焙：落在闭墙上、或实心盒内及边界的槽位保持透明。
+
+`samples` 的查询结果包含 `sampled`、`outside`、`solid` 或 `unsupported`。只有一套网格覆盖时沿用该格原有取样规则（该格支持率即 `Weight`，按其自身权重归一）。两套网格都覆盖时，在以墙为中心、宽度 `Transition` 的过渡带内按有符号墙距把名义权重从对应一侧的全权重线性移交另一侧，带外沿用端值（0 或 1）。每套网格用原邻点权重取样，只让有效且视线畅通的邻点提供支持；各格支持率乘该格名义权重，求和得到总支持率 `Weight`，并用这些有效权重归一线性色。闭墙或实心位置（`solid`）、两格均未覆盖（`outside`）和覆盖内无支持（`unsupported`）互相区分。`Samples[].Contributions` 逐格给出 `Support`、`Nominal`、`Effective`。JSON 中是线性域参考值；不含间接反弹或材质模拟。
+
+ZIP 包含 `layout.json` 与每套网格一张六方向贴图（`probes-0.png`、`probes-1.png`；旧式单网格仍为 `probes.png`）。栅格坐标 `(x,y,z)` 与方向 `face` 的像素为 `(x+face*X,y+z*Y)`。有效像素 Alpha 为 255，即使其 RGB 全零；无效像素透明。RGB 使用 `round(255*(1-exp(-energy*Exposure)))` 映射，不是 sRGB 纹理。消费方应使用线性纹理采样并按 Alpha 判断有效性。
 
 ## HTTP 接口
 
 | 入口 | 结果 |
 | --- | --- |
 | `GET /healthz` | 进程就绪 |
-| `GET /v1/example` | 无外部依赖的合成请求 |
+| `GET /v1/example` | 无外部依赖的合成双网格请求 |
 | `POST /v1/build` | 新成品返回 201；已存在的相同制品返回 200；均带 `digest`、`bytes`、`artifact` 与 `Location` |
 | `GET /v1/artifacts/{digest}` | 原始成品下载；支持 ETag 与字节范围；未知摘要 404，摘要不符 409 |
 

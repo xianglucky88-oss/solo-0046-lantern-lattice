@@ -1,6 +1,6 @@
 # 灯格 · 遮挡探针烘焙
 
-面向静态场景照明烘焙师。输入三维均匀测点网格、点光源、遮挡盒和采样坐标，输出六方向 RGB 探针 PNG 条带、有效位与空间采样数据。仅提供 HTTP API，不包含前端，不依赖第三方 Go 模块。
+面向静态场景照明烘焙师。一次烘焙可为分处一张无厚度可倾斜薄墙两侧、间距不同的两套三维测点网格各输出六方向 RGB 探针 PNG 条带、有效位与空间采样数据，并能用同一世界坐标跨门取光。输入三维均匀测点网格、点光源、遮挡盒和采样坐标；仅提供 HTTP API，不包含前端，不依赖第三方 Go 模块。
 
 ## 运行
 
@@ -17,7 +17,7 @@ curl -fsS http://127.0.0.1:8752/v1/example -o request.json
 curl -fsS -H 'Content-Type: application/json' --data-binary @request.json http://127.0.0.1:8752/v1/build
 ```
 
-取返回 JSON 里的 `artifact` 路径，向同一服务发送 GET，获得 `probe-volume.zip`。输出摘要是交付原始字节的 SHA-256。
+取返回 JSON 里的 `artifact` 路径，向同一服务发送 GET，获得 `probe-volume.zip`。压缩包内 `layout.json` 描述场景与采样，`probes-0.png`、`probes-1.png` 分别是两套网格的六方向贴图。输出摘要是交付原始字节的 SHA-256。
 
 ## 核验
 
