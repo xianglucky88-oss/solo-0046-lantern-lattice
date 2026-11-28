@@ -80,8 +80,8 @@ def contract(s):
 
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else 'all'
-    if mode not in ('product', 'persistence', 'contract', 'all'):
-        raise SystemExit('mode: product | persistence | contract | all')
+    if mode not in ('product', 'persistence', 'contract', 'normals', 'all'):
+        raise SystemExit('mode: product | persistence | contract | normals | all')
     with tempfile.TemporaryDirectory(prefix='media-workflow-') as root:
         binary, data = Path(root)/'server', Path(root)/'artifacts'
         subprocess.run(['go','build','-o',str(binary),'./cmd/server'], check=True)
@@ -90,6 +90,8 @@ def main():
                 contract(s)
             if mode in ('product', 'all'):
                 check_product(s)
+            if mode in ('normals', 'all'):
+                check_normals(s)
             if mode in ('persistence', 'all'):
                 example = s.demo()
                 with concurrent.futures.ThreadPoolExecutor(2) as pool:
@@ -167,6 +169,117 @@ def check_product(s):
     assert s.post(req)[0]==422
     req['Grid']['Size']=[3,2,2]; req['Blocks'][0]['Min']=req['Blocks'][0]['Max']
     assert s.post(req)[0]==422
+
+
+
+def normals_scene():
+    return {
+        'Grid': {'Origin': [0, 0, 0], 'Step': 1, 'Size': [3, 2, 2]},
+        'Exposure': 3,
+        'Lights': [
+            {'Position': [-1, 0.5, 0], 'RGB': [1, 0.55, 0.2], 'Radius': 6, 'Power': 4},
+            {'Position': [2, 3, 1], 'RGB': [0.2, 0.9, 0.4], 'Radius': 20, 'Power': 2.5},
+        ],
+        'Blocks': [{'Min': [0.8, -0.2, -0.2], 'Max': [1.2, 0.2, 0.2]}],
+        'Samples': [[0.5, 0.5, 0.5], [1.5, 1.25, 0.75], [2, 2, 1], [3, 0, 0]],
+        'Normals': [[1, 0, 0], [-1, 0, 0], [0.6, 0.8, 0], [0, 0, -1]],
+    }
+
+
+def layout_of(s, scene):
+    row = receipt(s.post(scene))
+    blob = fetch(s, row)
+    with zipfile.ZipFile(io.BytesIO(blob)) as z:
+        return row, json.loads(z.read('layout.json')), blob
+
+
+def check_normals(s):
+    scene = normals_scene()
+    plain = dict(scene)
+    plain.pop('Normals')
+
+    # Without normals the artifact keeps the historical shape and digest.
+    legacy_row, legacy_layout, legacy_blob = layout_of(s, plain)
+    assert 'NormalResource' not in legacy_layout and 'NormalSamples' not in legacy_layout
+    # An explicit normals list must match the sample count.
+    assert s.post(dict(plain, Normals=[[0, 0, 1]]))[0] == 422
+
+    row, layout, blob = layout_of(s, scene)
+    assert layout['Schema'] == 'lantern-probes/v1'
+    assert [x['State'] for x in layout['NormalSamples']] == [x['State'] for x in layout['Samples']]
+    for a, b in zip(layout['NormalSamples'], layout['Samples']):
+        assert abs(a['Weight'] - b['Weight']) < 1e-12
+    resource = layout['NormalResource']
+    assert resource['Schema'] == 'lantern-normal-probes/v1'
+    assert len(resource['Probes']) == 3 * 2 * 2
+
+    # The downloaded package alone answers a normals readout over HTTP.
+    probe = {'Digest': row['digest'],
+             'Position': scene['Samples'][0], 'Normal': scene['Normals'][0]}
+    status, _, body = s.call('/v1/normals/sample', json.dumps(probe).encode(),
+                             {'Content-Type': 'application/json'})
+    assert status == 200
+    assert json.loads(body)['Irradiance'] == layout['NormalSamples'][0]['Irradiance']
+    inline = {'Layout': layout, 'Position': scene['Samples'][2], 'Normal': scene['Normals'][2]}
+    status, _, body = s.call('/v1/normals/sample', json.dumps(inline).encode(),
+                             {'Content-Type': 'application/json'})
+    assert status == 200 and json.loads(body)['Irradiance'] == layout['NormalSamples'][2]['Irradiance']
+    status, _, _ = s.call('/v1/normals/sample',
+                          json.dumps({'Digest': legacy_row['digest'], 'Position': [0, 0, 0],
+                                      'Normal': [1, 0, 0]}).encode(),
+                          {'Content-Type': 'application/json'})
+    assert status == 409
+
+    # Axis-aligned normals reproduce the legacy six-direction lobes exactly.
+    axes = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]
+    for sample, legacy in zip(layout['Samples'], layout['Samples']):
+        for k, axis in enumerate(axes):
+            query = {'Layout': layout, 'Position': sample['Position'], 'Normal': axis}
+            status, _, body = s.call('/v1/normals/sample', json.dumps(query).encode(),
+                                     {'Content-Type': 'application/json'})
+            assert status == 200
+            got = json.loads(body)['Irradiance']
+            assert max(abs(got[c] - legacy['Irradiance'][k][c]) for c in range(3)) < 1e-9
+
+    # Hemisphere edge and back face contribute nothing; opposite normals differ.
+    single = {
+        'Grid': {'Origin': [0, 0, 0], 'Step': 1, 'Size': [3, 2, 2]}, 'Exposure': 3,
+        'Lights': [{'Position': [-1, 0, 0], 'RGB': [1, 0.5, 0.25], 'Radius': 6, 'Power': 4}],
+        'Blocks': [], 'Samples': [[0, 0, 0]], 'Normals': [[-1, 0, 0]],
+    }
+    _, slayout, _ = layout_of(s, single)
+    # The light sits at -X, so -X faces the hemisphere and +X is the back.
+    forward = slayout['NormalSamples'][0]['Irradiance']
+    assert max(forward) > 0
+    for normal in ([0, 1, 0], [0, 0, 1], [1, 0, 0]):
+        query = {'Layout': slayout, 'Position': [0, 0, 0], 'Normal': normal}
+        status, _, body = s.call('/v1/normals/sample', json.dumps(query).encode(),
+                                 {'Content-Type': 'application/json'})
+        assert max(abs(v) for v in json.loads(body)['Irradiance']) < 1e-12, normal
+
+    # A light coincident with the probe gives every normal the same response.
+    coincident = dict(single, Lights=[{'Position': [0, 0, 0], 'RGB': [1, 0.5, 0.25],
+                                       'Radius': 6, 'Power': 4}], Samples=[[0, 0, 0]])
+    _, clayout, _ = layout_of(s, coincident)
+    responses = []
+    for normal in axes + [[0.6, 0.8, 0]]:
+        query = {'Layout': clayout, 'Position': [0, 0, 0], 'Normal': normal}
+        status, _, body = s.call('/v1/normals/sample', json.dumps(query).encode(),
+                                 {'Content-Type': 'application/json'})
+        assert status == 200
+        responses.append(json.loads(body)['Irradiance'])
+    assert all(max(abs(v[c] - responses[0][c]) for c in range(3)) < 1e-12
+               for v in responses[1:])
+
+    # Invalid normals are rejected at build time; mismatched counts too.
+    broken = dict(scene, Normals=scene['Normals'][:2])
+    assert s.post(broken)[0] == 422
+    # A zero normal carries no hemisphere: state and support follow the
+    # ordinary sample, but no light is gathered.
+    _, zlayout, _ = layout_of(s, dict(scene, Normals=[[0, 0, 0]] * 4))
+    for a, b in zip(zlayout['NormalSamples'], zlayout['Samples']):
+        assert a['State'] == b['State'] and abs(a['Weight'] - b['Weight']) < 1e-12
+        assert max(abs(v) for v in a['Irradiance']) == 0
 
 
 if __name__ == '__main__':

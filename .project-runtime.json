@@ -18,6 +18,10 @@
     {
       "workflow_id": "contract",
       "command": "python3 -B tools/verify.py contract"
+    },
+    {
+      "workflow_id": "normals",
+      "command": "python3 -B tools/verify.py normals"
     }
   ]
 }

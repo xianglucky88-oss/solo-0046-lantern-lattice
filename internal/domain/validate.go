@@ -54,5 +54,13 @@ func validate(r Request) error {
 			return fmt.Errorf("query %d invalid", i)
 		}
 	}
+	if r.normalsEnabled() && len(r.Normals) != len(r.Samples) {
+		return fmt.Errorf("receiver normals must match the number of samples")
+	}
+	for i, n := range r.Normals {
+		if !bounded(n[0], -1e5, 1e5) || !bounded(n[1], -1e5, 1e5) || !bounded(n[2], -1e5, 1e5) {
+			return fmt.Errorf("query normal %d invalid", i)
+		}
+	}
 	return nil
 }

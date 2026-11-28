@@ -2,6 +2,11 @@
   "project_shape": "backend",
   "modules": [
     {
+      "id": "cmd-readprobe-main",
+      "path": "cmd/readprobe/main.go",
+      "role": "offline-readout"
+    },
+    {
       "id": "cmd-server-config",
       "path": "cmd/server/config.go",
       "role": "config"
@@ -65,6 +70,16 @@
       "id": "internal-domain-meters",
       "path": "internal/domain/meters.go",
       "role": "meters"
+    },
+    {
+      "id": "internal-domain-normal",
+      "path": "internal/domain/normal.go",
+      "role": "normal"
+    },
+    {
+      "id": "internal-domain-normal-resource",
+      "path": "internal/domain/normal_resource.go",
+      "role": "normal-resource"
     },
     {
       "id": "internal-domain-occupancy",
@@ -145,6 +160,11 @@
       "id": "internal-service-health",
       "path": "internal/service/health.go",
       "role": "health"
+    },
+    {
+      "id": "internal-service-normal",
+      "path": "internal/service/normal.go",
+      "role": "normal"
     },
     {
       "id": "internal-service-output",
@@ -238,6 +258,27 @@
         "internal-service-router",
         "internal-service-decode",
         "internal-service-output"
+      ]
+    },
+    {
+      "id": "normals",
+      "name": "接收面法线取光",
+      "entry": "可选 Normals 与 POST /v1/normals/sample、cmd/readprobe",
+      "success": "按非零单位法线取半球余弦加权的线性 RGB；下载资源加位置与法线即可离线读取。",
+      "failure": "法线数量与取样不符返回 422；未启用新能力时仍照常交付六方向成品与无方向取样。",
+      "verification": "python3 -B tools/verify.py normals",
+      "steps": [
+        "POST /v1/build（带可选 Normals）",
+        "layout.json 内嵌 NormalResource 与 NormalSamples",
+        "POST /v1/normals/sample 或 cmd/readprobe 仅凭下载资源、位置与法线取光"
+      ],
+      "module_ids": [
+        "internal-domain-normal",
+        "internal-domain-normal-resource",
+        "internal-domain-interpolation",
+        "internal-domain-accumulate",
+        "internal-service-normal",
+        "cmd-readprobe-main"
       ]
     }
   ],
